@@ -1,0 +1,9 @@
+langchain==0.3.26
+langchain-core==0.3.86
+langchain-community==0.3.26
+langchain-ollama==0.2.3
+langchain-chroma==0.2.4
+chromadb>=0.5
+pymupdf>=1.24
+rank-bm25>=0.2.2
+python-dotenv>=1.0
