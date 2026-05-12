@@ -3,6 +3,7 @@ Ingestion pipeline. Run directly:
     python -m core.ingest [--force]
 """
 import argparse
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -20,6 +21,7 @@ from adapters.csv_adapter import load_csv_documents, collect_csv_file_paths
 
 def run_ingest(force: bool = False, limit: int | None = None) -> None:
     print("=== LocalLang Ingestion Pipeline ===\n")
+    print(f"Hardware:  {_detect_hardware()}\n")
 
     registry = {} if force else load_registry(config.INDEX_REGISTRY_PATH)
 
@@ -78,12 +80,17 @@ def run_ingest(force: bool = False, limit: int | None = None) -> None:
         base_url=config.OLLAMA_BASE_URL,
     )
 
-    sample_size = min(3, len(chunks))
-    print(f"  Benchmarking speed (sample: {sample_size} chunk(s))...", end=" ", flush=True)
+    warmup_size = min(15, len(chunks))
+    print(f"  Warming up GPU ({warmup_size} chunk(s))...", end=" ", flush=True)
+    embeddings.embed_documents([c.page_content for c in chunks[:warmup_size]])
+    print("done")
+
+    sample_size = min(30, len(chunks))
+    print(f"  Benchmarking speed ({sample_size} chunk(s))...", end=" ", flush=True)
     t0 = time.time()
     embeddings.embed_documents([c.page_content for c in chunks[:sample_size]])
     rate = sample_size / (time.time() - t0)
-    est_sec = (len(chunks) - sample_size) / rate * 1.15
+    est_sec = len(chunks) / rate
     m, s = divmod(int(est_sec), 60)
     duration = f"~{m}m {s:02d}s" if m else f"~{s}s"
     print(f"{rate:.0f} chunks/sec  →  estimated {duration} ({len(chunks)} chunks)")
@@ -100,9 +107,24 @@ def run_ingest(force: bool = False, limit: int | None = None) -> None:
 
     # Chroma enforces a max batch size; split to stay within it
     batch_size = 5000
+    ingest_start = time.time()
+    processed = 0
+    print("  Starting ingestion...", end="", flush=True)
     for i in range(0, len(chunks), batch_size):
         vectorstore.add_documents(chunks[i:i + batch_size], ids=ids[i:i + batch_size])
-    print(f"Upserted {len(chunks)} chunk(s) into Chroma.")
+        processed += len(chunks[i:i + batch_size])
+        elapsed = time.time() - ingest_start
+        live_rate = processed / elapsed
+        remaining = (len(chunks) - processed) / live_rate
+        rm, rs = divmod(int(remaining), 60)
+        pct = processed / len(chunks) * 100
+        filled = int(25 * processed / len(chunks))
+        bar = "█" * filled + "░" * (25 - filled)
+        print(
+            f"\r  [{bar}] {pct:.0f}% | {processed:,}/{len(chunks):,} | {live_rate:.0f} ch/s | ETA ~{rm}m {rs:02d}s  ",
+            end="", flush=True,
+        )
+    print(f"\nUpserted {len(chunks)} chunk(s) into Chroma.")
 
     # Update registry
     for path, hash_val in files_to_process:
@@ -127,6 +149,22 @@ def _load_documents_for_paths(target_paths: set[str]):
         docs.extend(d for d in csv_docs if d.metadata.get("source") in target_paths)
 
     return docs
+
+
+def _detect_hardware() -> str:
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            lines = [l.strip() for l in result.stdout.strip().splitlines() if l.strip()]
+            if lines:
+                name, mem = lines[0].split(",", 1)
+                return f"GPU: {name.strip()} ({int(mem.strip()):,} MiB VRAM)"
+    except Exception:
+        pass
+    return "CPU (no NVIDIA GPU detected)"
 
 
 if __name__ == "__main__":
