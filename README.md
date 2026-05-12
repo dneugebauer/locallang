@@ -8,58 +8,6 @@ Index a local repository or PDF directory, then ask questions about it from the 
 
 Built on [LangChain](https://python.langchain.com/), [Ollama](https://ollama.com/), and [Chroma](https://www.tropic.io/chroma).
 
-## Architecture
-
-### Chat loop
-
-```mermaid
-flowchart LR
-    A([User question]) --> B{Hybrid Retriever}
-    B -->|Semantic 60%| C[Chroma]
-    B -->|Keyword 40%| D[BM25]
-    C & D --> E[Top-k fusion]
-    E --> F[ChatOllama]
-    F --> G([Streamed answer\n+ source citations])
-    G --> A
-```
-
-### System architecture
-
-```mermaid
-flowchart TD
-    subgraph src ["Local files"]
-        S1[Code repos]
-        S2[PDFs]
-        S3[CSVs]
-    end
-
-    subgraph adapters ["Adapter layer"]
-        A1[github_adapter]
-        A2[pdf_adapter]
-        A3[csv_adapter]
-    end
-
-    subgraph ingest ["Ingestion pipeline · core/ingest.py"]
-        I1[MD5 registry diff\nskip unchanged files]
-        I2[RecursiveCharacter\nTextSplitter]
-        I3[OllamaEmbeddings\nnomic-embed-text]
-    end
-
-    subgraph retrieval ["Retrieval · core/retriever.py"]
-        R1[Chroma\nsemantic search]
-        R2[BM25\nkeyword search]
-        R3[EnsembleRetriever\nfusion + top-k slice]
-    end
-
-    S1 & S2 & S3 --> A1 & A2 & A3
-    A1 & A2 & A3 --> I1 --> I2 --> I3 --> DB[(Chroma\nvector store)]
-    DB --> R1
-    Q([User question]) --> R1 & R2
-    R1 & R2 --> R3
-    R3 --> LLM[ChatOllama\nqwen2.5-coder:14b · llama3.2:3b]
-    LLM --> ANS([Streamed answer + citations])
-```
-
 ## Prerequisites
 
 - Python 3.11+
@@ -181,3 +129,54 @@ locallang/
 - On an RTX 5080, nomic-embed-text embeds at ~130 chunks/sec on GPU vs ~6 chunks/sec on CPU
 - Chroma enforces a max upsert batch size of 5461 — the pipeline batches in groups of 5000 automatically
 
+## Architecture
+
+### Chat loop
+
+```mermaid
+flowchart LR
+    A([User question]) --> B{Hybrid Retriever}
+    B -->|Semantic 60%| C[Chroma]
+    B -->|Keyword 40%| D[BM25]
+    C & D --> E[Top-k fusion]
+    E --> F[ChatOllama]
+    F --> G([Streamed answer\n+ source citations])
+    G --> A
+```
+
+### System architecture
+
+```mermaid
+flowchart TD
+    subgraph src ["Local files"]
+        S1[Code repos]
+        S2[PDFs]
+        S3[CSVs]
+    end
+
+    subgraph adapters ["Adapter layer"]
+        A1[github_adapter]
+        A2[pdf_adapter]
+        A3[csv_adapter]
+    end
+
+    subgraph ingest ["Ingestion pipeline · core/ingest.py"]
+        I1[MD5 registry diff\nskip unchanged files]
+        I2[RecursiveCharacter\nTextSplitter]
+        I3[OllamaEmbeddings\nnomic-embed-text]
+    end
+
+    subgraph retrieval ["Retrieval · core/retriever.py"]
+        R1[Chroma\nsemantic search]
+        R2[BM25\nkeyword search]
+        R3[EnsembleRetriever\nfusion + top-k slice]
+    end
+
+    S1 & S2 & S3 --> A1 & A2 & A3
+    A1 & A2 & A3 --> I1 --> I2 --> I3 --> DB[(Chroma\nvector store)]
+    DB --> R1
+    Q([User question]) --> R1 & R2
+    R1 & R2 --> R3
+    R3 --> LLM[ChatOllama\nqwen2.5-coder:14b · llama3.2:3b]
+    LLM --> ANS([Streamed answer + citations])
+```
