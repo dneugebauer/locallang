@@ -110,25 +110,31 @@ Use `reindex.py` when switching projects or sources. Use `core.ingest` to augmen
 python chat.py
 ```
 
+On startup, an interactive model picker fetches all available Ollama models and lets you select with arrow keys. The cursor defaults to `LLM_MODEL` from `.env`.
+
+Conversation history is maintained within a session — follow-up questions have full context of prior exchanges.
+
 **Commands:**
 - `exit` / `quit` — close the session
-- `clear` — clear the terminal
+- `clear` — clear the terminal and reset conversation history
 
-Responses stream token-by-token. Sources are displayed after each answer.
+Sources are displayed after each answer. LaTeX math formatting is automatically stripped for clean terminal output.
 
 ## Project Structure
 
 ```
 locallang/
-├── chat.py                 # Terminal chat entry point
+├── chat.py                 # Terminal chat entry point (model picker, history, sanitizer)
+├── reindex.py              # Wipe and rebuild index from scratch
 ├── config.py               # Configuration (reads from .env)
 ├── requirements.txt
 ├── .env.example
+├── CLAUDE.md               # Claude Code instructions for this project
 ├── core/
 │   ├── ingest.py           # Ingestion pipeline orchestrator
 │   ├── retriever.py        # Hybrid semantic + BM25 retriever
-│   ├── chain.py            # LLM prompt and streaming setup
-│   └── registry.py        # MD5-based file change tracking
+│   ├── chain.py            # LLM prompt, conversation history, streaming
+│   └── registry.py         # MD5-based file change tracking
 ├── adapters/
 │   ├── github_adapter.py   # Local repo / code file loader
 │   └── pdf_adapter.py      # PyMuPDF PDF loader
