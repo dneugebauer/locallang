@@ -1,5 +1,6 @@
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.documents import Document
 
 import config
@@ -39,5 +40,12 @@ def build_llm(model: str | None = None):
     )
 
 
-def make_messages(context: str, question: str):
-    return _prompt.format_messages(context=context, question=question)
+def make_messages(context: str, question: str, history: list = []):
+    messages = _prompt.format_messages(context=context, question="[see history]")
+    # Replace the placeholder human message with full history + current question
+    messages = messages[:-1]  # drop the placeholder
+    for human, assistant in history:
+        messages.append(HumanMessage(content=human))
+        messages.append(AIMessage(content=assistant))
+    messages.append(HumanMessage(content=question))
+    return messages

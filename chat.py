@@ -152,8 +152,10 @@ def main() -> None:
     print(f"  LocalLang Terminal RAG")
     print(f"  Model:  {chosen_model}")
     print(f"  Chunks: {count}")
-    print(f"  Type 'exit' or 'quit' to leave, 'clear' to clear screen")
+    print(f"  Type 'exit' or 'quit' to leave, 'clear' to clear screen and reset conversation")
     print(f"{'='*50}\n")
+
+    history = []
 
     while True:
         try:
@@ -169,16 +171,21 @@ def main() -> None:
             break
         if user_input.lower() == "clear":
             os.system("clear")
+            history = []
             continue
 
         docs = retriever.invoke(user_input)
-        messages = make_messages(format_docs(docs), user_input)
+        messages = make_messages(format_docs(docs), user_input, history)
         print("\nAssistant: ", end="", flush=True)
+        answer = ""
         for chunk in llm.stream(messages):
             print(chunk.content, end="", flush=True)
+            answer += chunk.content
         print("\n")
         print_sources(docs)
         print()
+
+        history.append((user_input, answer))
 
 
 if __name__ == "__main__":
