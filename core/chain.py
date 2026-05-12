@@ -31,9 +31,9 @@ def format_docs(docs: list[Document]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-def build_llm():
+def build_llm(model: str | None = None):
     return ChatOllama(
-        model=config.LLM_MODEL,
+        model=model or config.LLM_MODEL,
         base_url=config.OLLAMA_BASE_URL,
     )
 
