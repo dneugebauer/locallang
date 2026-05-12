@@ -65,7 +65,7 @@ cp .env.example .env
 # Edit .env — set TARGET_REPO_PATH and/or PDF_SOURCE_DIR
 
 # 3. Index your documents
-python -m core.ingest
+python reindex.py
 
 # 4. Start chatting
 python chat.py
@@ -92,14 +92,17 @@ All settings live in `.env` (copy from `.env.example`):
 ## Ingestion
 
 ```bash
-# Index new and changed files only (default)
+# Start a new RAG context (wipes existing index, then ingests from scratch)
+python reindex.py
+
+# Add to or update the current context (only processes new/changed files)
 python -m core.ingest
 
-# Force re-index everything
+# Force re-process all files without wiping the store
 python -m core.ingest --force
 ```
 
-The ingestion pipeline tracks processed files in `registry.json` using MD5 hashes. Re-running only processes files that are new or have changed since the last run.
+Use `reindex.py` when switching projects or sources. Use `core.ingest` to augment an existing index with new documents. The pipeline tracks processed files in `registry.json` using MD5 hashes — incremental runs skip unchanged files.
 
 ## Terminal Chat
 
