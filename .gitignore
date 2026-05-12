@@ -1,3 +1,6 @@
+# Documentation (kept local only)
+docs/
+
 # Local config
 .env
 

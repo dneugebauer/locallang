@@ -10,36 +10,54 @@ Built on [LangChain](https://python.langchain.com/), [Ollama](https://ollama.com
 
 ## Architecture
 
+### Chat loop
+
+```mermaid
+flowchart LR
+    A([User question]) --> B{Hybrid Retriever}
+    B -->|Semantic 60%| C[Chroma]
+    B -->|Keyword 40%| D[BM25]
+    C & D --> E[Top-k fusion]
+    E --> F[ChatOllama]
+    F --> G([Streamed answer\n+ source citations])
+    G --> A
 ```
-Local files (code, PDFs, CSVs)
-        │
-        ▼
-  Adapter Layer
-  ├── github_adapter  →  loads code/text files from a local repo
-  ├── pdf_adapter     →  extracts text per-page via PyMuPDF
-  └── csv_adapter     →  loads CSV rows as individual documents
-        │
-        ▼
-  Ingestion Pipeline (core/ingest.py)
-  ├── MD5 registry diff  →  skip unchanged files
-  ├── RecursiveCharacterTextSplitter
-  └── OllamaEmbeddings (nomic-embed-text)  →  Chroma vector store
-        │
-        ▼
-  Query (chat.py)
-        │
-        ▼
-  Hybrid Retriever (core/retriever.py)
-  ├── Chroma semantic search  (60%)
-  └── BM25 keyword search     (40%)
-        │
-  Top-k chunks
-        │
-        ▼
-  ChatOllama (qwen2.5-coder:14b or llama3.2:3b)
-        │
-        ▼
-  Streamed answer + source citations
+
+### System architecture
+
+```mermaid
+flowchart TD
+    subgraph src ["Local files"]
+        S1[Code repos]
+        S2[PDFs]
+        S3[CSVs]
+    end
+
+    subgraph adapters ["Adapter layer"]
+        A1[github_adapter]
+        A2[pdf_adapter]
+        A3[csv_adapter]
+    end
+
+    subgraph ingest ["Ingestion pipeline · core/ingest.py"]
+        I1[MD5 registry diff\nskip unchanged files]
+        I2[RecursiveCharacter\nTextSplitter]
+        I3[OllamaEmbeddings\nnomic-embed-text]
+    end
+
+    subgraph retrieval ["Retrieval · core/retriever.py"]
+        R1[Chroma\nsemantic search]
+        R2[BM25\nkeyword search]
+        R3[EnsembleRetriever\nfusion + top-k slice]
+    end
+
+    S1 & S2 & S3 --> A1 & A2 & A3
+    A1 & A2 & A3 --> I1 --> I2 --> I3 --> DB[(Chroma\nvector store)]
+    DB --> R1
+    Q([User question]) --> R1 & R2
+    R1 & R2 --> R3
+    R3 --> LLM[ChatOllama\nqwen2.5-coder:14b · llama3.2:3b]
+    LLM --> ANS([Streamed answer + citations])
 ```
 
 ## Prerequisites
@@ -152,9 +170,7 @@ locallang/
 │   ├── github_adapter.py      # Local repo / code file loader
 │   ├── pdf_adapter.py         # PyMuPDF PDF loader
 │   └── csv_adapter.py         # CSV loader — one document per row
-├── sample_docs/               # Gitignored — drop test PDFs and CSVs here
-└── docs/
-    └── prd.md                 # Product requirements document
+└── sample_docs/               # Gitignored — drop test PDFs and CSVs here
 ```
 
 ## Performance Tips
