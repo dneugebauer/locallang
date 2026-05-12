@@ -6,6 +6,9 @@ chroma_store/
 registry.json
 logs/
 
+# Test documents (drop PDFs here locally, never commit)
+sample_docs/
+
 # Python
 __pycache__/
 *.pyc

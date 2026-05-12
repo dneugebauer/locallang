@@ -11,12 +11,13 @@ Built on [LangChain](https://python.langchain.com/), [Ollama](https://ollama.com
 ## Architecture
 
 ```
-Local files (code, PDFs)
+Local files (code, PDFs, CSVs)
         │
         ▼
   Adapter Layer
   ├── github_adapter  →  loads code/text files from a local repo
-  └── pdf_adapter     →  extracts text per-page via PyMuPDF
+  ├── pdf_adapter     →  extracts text per-page via PyMuPDF
+  └── csv_adapter     →  loads CSV rows as individual documents
         │
         ▼
   Ingestion Pipeline (core/ingest.py)
@@ -44,7 +45,13 @@ Local files (code, PDFs)
 ## Prerequisites
 
 - Python 3.11+
-- [Ollama](https://ollama.com/) running locally
+- [Ollama](https://ollama.com/) running locally — install via the **official script**, not snap:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+> **WSL2 + NVIDIA GPU:** the snap package does not have access to WSL2's CUDA libraries and will fall back to CPU. The official installer auto-detects the GPU and runs ~20x faster for embeddings.
 
 Pull the required models:
 
@@ -78,7 +85,7 @@ All settings live in `.env` (copy from `.env.example`):
 | Variable | Default | Description |
 |---|---|---|
 | `TARGET_REPO_PATH` | _(empty)_ | Path to a local code repository |
-| `PDF_SOURCE_DIR` | _(empty)_ | Path to a directory of PDFs |
+| `PDF_SOURCE_DIR` | _(empty)_ | Path to a directory of PDFs and/or CSVs |
 | `CHROMA_PERSIST_DIR` | `./chroma_store` | Where the vector store is saved |
 | `LLM_MODEL` | `qwen2.5-coder:14b` | Ollama model for answering queries |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Ollama model for embeddings |
@@ -94,6 +101,9 @@ All settings live in `.env` (copy from `.env.example`):
 ```bash
 # Start a new RAG context (wipes existing index, then ingests from scratch)
 python reindex.py
+
+# Cap the number of documents ingested — useful for fast test runs (~5 min with 10k rows)
+python reindex.py --limit 10000
 
 # Add to or update the current context (only processes new/changed files)
 python -m core.ingest
@@ -112,6 +122,8 @@ python chat.py
 
 On startup, an interactive model picker fetches all available Ollama models and lets you select with arrow keys. The cursor defaults to `LLM_MODEL` from `.env`.
 
+The startup banner shows the active model, detected GPU, and chunk count for quick confirmation that the system is configured correctly.
+
 Conversation history is maintained within a session — follow-up questions have full context of prior exchanges.
 
 **Commands:**
@@ -124,22 +136,25 @@ Sources are displayed after each answer. LaTeX math formatting is automatically 
 
 ```
 locallang/
-├── chat.py                 # Terminal chat entry point (model picker, history, sanitizer)
-├── reindex.py              # Wipe and rebuild index from scratch
-├── config.py               # Configuration (reads from .env)
+├── chat.py                    # Terminal chat entry point (model picker, history, sanitizer)
+├── reindex.py                 # Wipe and rebuild index from scratch
+├── config.py                  # Configuration (reads from .env)
+├── generate_brewery_data.py   # Generates mock brewery sales CSV for testing
 ├── requirements.txt
 ├── .env.example
-├── CLAUDE.md               # Claude Code instructions for this project
+├── CLAUDE.md                  # Claude Code instructions for this project
 ├── core/
-│   ├── ingest.py           # Ingestion pipeline orchestrator
-│   ├── retriever.py        # Hybrid semantic + BM25 retriever
-│   ├── chain.py            # LLM prompt, conversation history, streaming
-│   └── registry.py         # MD5-based file change tracking
+│   ├── ingest.py              # Ingestion pipeline orchestrator
+│   ├── retriever.py           # Hybrid semantic + BM25 retriever
+│   ├── chain.py               # LLM prompt, conversation history, streaming
+│   └── registry.py            # MD5-based file change tracking
 ├── adapters/
-│   ├── github_adapter.py   # Local repo / code file loader
-│   └── pdf_adapter.py      # PyMuPDF PDF loader
+│   ├── github_adapter.py      # Local repo / code file loader
+│   ├── pdf_adapter.py         # PyMuPDF PDF loader
+│   └── csv_adapter.py         # CSV loader — one document per row
+├── sample_docs/               # Gitignored — drop test PDFs and CSVs here
 └── docs/
-    └── prd.md              # Product requirements document
+    └── prd.md                 # Product requirements document
 ```
 
 ## Performance Tips
@@ -147,6 +162,9 @@ locallang/
 - Use `llama3.2:3b` during development for fast responses; switch to `qwen2.5-coder:14b` for production quality
 - Lower `NUM_RETRIEVED_CHUNKS` to reduce time-to-first-token
 - Set `OLLAMA_MAX_LOADED_MODELS=2` in your environment before starting Ollama to keep both the embedding model and LLM loaded simultaneously
+- Install Ollama via the official script (not snap) for GPU support on WSL2 — snap runs sandboxed and cannot access CUDA libraries
+- On an RTX 5080, nomic-embed-text embeds at ~130 chunks/sec on GPU vs ~6 chunks/sec on CPU
+- Chroma enforces a max upsert batch size of 5461 — the pipeline batches in groups of 5000 automatically
 
 ## Roadmap
 

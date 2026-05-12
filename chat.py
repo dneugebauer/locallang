@@ -4,6 +4,7 @@ Terminal chat loop.
 """
 import os
 import re
+import subprocess
 import sys
 import tty
 import termios
@@ -18,8 +19,22 @@ from core.retriever import build_retriever
 from core.chain import build_llm, make_messages, format_docs
 from adapters.github_adapter import load_repo_documents
 from adapters.pdf_adapter import load_pdf_documents
+from adapters.csv_adapter import load_csv_documents
 
 EMBEDDING_MODELS = {"nomic-embed-text", "mxbai-embed-large", "all-minilm", "nomic-embed-text:latest"}
+
+
+def get_gpu_name() -> str:
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=2,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip().split("\n")[0]
+    except Exception:
+        pass
+    return "CPU only"
 
 
 def check_ollama() -> bool:
@@ -92,6 +107,7 @@ def load_all_docs():
         docs.extend(load_repo_documents(config.TARGET_REPO_PATH))
     if config.PDF_SOURCE_DIR:
         docs.extend(load_pdf_documents(config.PDF_SOURCE_DIR))
+        docs.extend(load_csv_documents(config.PDF_SOURCE_DIR))
     return docs
 
 
@@ -178,6 +194,7 @@ def main() -> None:
     print(f"\n{'='*50}")
     print(f"  LocalLang Terminal RAG")
     print(f"  Model:  {chosen_model}")
+    print(f"  GPU:    {get_gpu_name()}")
     print(f"  Chunks: {count}")
     print(f"  Type 'exit' or 'quit' to leave, 'clear' to clear screen and reset conversation")
     print(f"{'='*50}\n")
