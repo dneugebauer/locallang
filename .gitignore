@@ -1,5 +1,6 @@
-# Documentation (kept local only)
+# Documentation and project instructions (kept local only)
 docs/
+CLAUDE.md
 
 # Local config
 .env

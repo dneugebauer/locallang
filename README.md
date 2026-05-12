@@ -157,10 +157,9 @@ locallang/
 ├── chat.py                    # Terminal chat entry point (model picker, history, sanitizer)
 ├── reindex.py                 # Wipe and rebuild index from scratch
 ├── config.py                  # Configuration (reads from .env)
-├── generate_brewery_data.py   # Generates mock brewery sales CSV for testing
+├── generate_sample_data.py    # Generates mock sales CSV for testing
 ├── requirements.txt
 ├── .env.example
-├── CLAUDE.md                  # Claude Code instructions for this project
 ├── core/
 │   ├── ingest.py              # Ingestion pipeline orchestrator
 │   ├── retriever.py           # Hybrid semantic + BM25 retriever
@@ -182,9 +181,3 @@ locallang/
 - On an RTX 5080, nomic-embed-text embeds at ~130 chunks/sec on GPU vs ~6 chunks/sec on CPU
 - Chroma enforces a max upsert batch size of 5461 — the pipeline batches in groups of 5000 automatically
 
-## Roadmap
-
-- **Phase 2** — FastAPI backend + React frontend with streaming chat UI
-- **Phase 3** — Brewery deployment with Square POS, Ekos, and QuickBooks adapters
-- **Phase 4** — Daily incremental ingestion pipeline (Prefect/cron)
-- **Phase 5** — Client packaging for law firms, healthcare, and other SMBs

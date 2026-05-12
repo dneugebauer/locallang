@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Generate mock brewery sales transaction data for RAG testing.
-Outputs sample_docs/brewery_sales.csv (≤ 80 MB).
-Run from the repo root: python generate_brewery_data.py
+Generate mock sales transaction data for RAG testing.
+Outputs sample_docs/sample_sales.csv (≤ 80 MB).
+Run from the repo root: python generate_sample_data.py
 """
 import csv
 import random
@@ -11,7 +11,7 @@ from pathlib import Path
 
 SEED = 42
 MAX_BYTES = 80 * 1024 * 1024
-OUTPUT = Path(__file__).parent / "sample_docs" / "brewery_sales.csv"
+OUTPUT = Path(__file__).parent / "sample_docs" / "sample_sales.csv"
 START_DATE = date(2021, 5, 11)
 END_DATE = date(2026, 5, 11)
 
@@ -51,16 +51,16 @@ SERVING_PRICES  = {s[0]: (s[1], s[2]) for s in SERVING_SIZES}
 PAYMENT_METHODS = ["Cash", "Credit", "Debit", "Tab"]
 PAYMENT_WEIGHTS = [0.20, 0.50, 0.20, 0.10]
 
-LOCATIONS        = ["Taproom", "Patio", "Event", "To-Go"]
+LOCATIONS        = ["In-Store", "Outdoor", "Event", "To-Go"]
 LOCATION_WEIGHTS = [0.60, 0.20, 0.15, 0.05]
 
 EVENTS = [
-    ("Trivia Night",  0.08),
-    ("Live Music",    0.10),
-    ("Beer Festival", 0.02),
-    ("Tap Takeover",  0.03),
-    ("Cask Night",    0.04),
-    ("Brewery Tour",  0.05),
+    ("Trivia Night",   0.08),
+    ("Live Music",     0.10),
+    ("Seasonal Sale",  0.02),
+    ("Pop-Up Market",  0.03),
+    ("Members Night",  0.04),
+    ("Store Tour",     0.05),
 ]
 
 STAFF = [f"STAFF_{i:03d}" for i in range(1, 16)]
@@ -190,6 +190,6 @@ def generate() -> None:
 
 
 if __name__ == "__main__":
-    print(f"Generating brewery sales data ({START_DATE} → {END_DATE})...")
+    print(f"Generating sample sales data ({START_DATE} → {END_DATE})...")
     generate()
     print("Done.")
