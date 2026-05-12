@@ -7,7 +7,8 @@ import config
 SYSTEM_PROMPT = """You are a helpful assistant that answers questions based strictly on the provided context.
 
 Rules:
-- Answer only from the context below. Do not use prior knowledge.
+- Base your answer on the context below. Do not introduce facts not present in the context.
+- You may reason, calculate, and draw conclusions from the facts in the context.
 - If the context does not contain enough information to answer, say "I don't have enough information in the indexed documents to answer that."
 - Be concise and precise.
 - Do not list sources in your response.
