@@ -3,6 +3,7 @@ Terminal chat loop.
     python chat.py
 """
 import os
+import re
 import sys
 import tty
 import termios
@@ -94,6 +95,32 @@ def load_all_docs():
     return docs
 
 
+def sanitize(text: str) -> str:
+    # Unwrap LaTeX display/inline math delimiters
+    text = re.sub(r'\\\[|\\\]|\\\(|\\\)', '', text)
+    # \text{content} → content
+    text = re.sub(r'\\text\{([^}]*)\}', r'\1', text)
+    # \frac{a}{b} → a/b
+    text = re.sub(r'\\frac\{([^}]*)\}\{([^}]*)\}', r'\1/\2', text)
+    # \boxed{content} → content
+    text = re.sub(r'\\boxed\{([^}]*)\}', r'\1', text)
+    # Common symbol replacements
+    replacements = {
+        r'\times': '×', r'\div': '÷', r'\approx': '≈',
+        r'\leq': '≤', r'\geq': '≥', r'\neq': '≠',
+        r'\cdot': '·', r'\pm': '±',
+    }
+    for latex, symbol in replacements.items():
+        text = text.replace(latex, symbol)
+    # Strip any remaining \command sequences
+    text = re.sub(r'\\[a-zA-Z]+', '', text)
+    # Clean up stray braces left from LaTeX
+    text = re.sub(r'(?<!\$)\{([^{}]*)\}', r'\1', text)
+    # Collapse runs of blank lines to a single blank line
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
 def print_sources(source_docs: list) -> None:
     if not source_docs:
         return
@@ -176,12 +203,11 @@ def main() -> None:
 
         docs = retriever.invoke(user_input)
         messages = make_messages(format_docs(docs), user_input, history)
-        print("\nAssistant: ", end="", flush=True)
+        print("\nThinking...", end="", flush=True)
         answer = ""
         for chunk in llm.stream(messages):
-            print(chunk.content, end="", flush=True)
             answer += chunk.content
-        print("\n")
+        print(f"\r\x1b[K\nAssistant: {sanitize(answer)}\n")
         print_sources(docs)
         print()
 
