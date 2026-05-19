@@ -27,6 +27,7 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 # Metadata extraction (runs once per new PDF/CSV at ingest time)
 EXTRACT_METADATA = os.getenv("EXTRACT_METADATA", "true").lower() == "true"
 EXTRACT_METADATA_MODEL = os.getenv("EXTRACT_METADATA_MODEL", LLM_MODEL)
+EXTRACT_METADATA_CHARS = int(os.getenv("EXTRACT_METADATA_CHARS", "3000"))
 
 # Retrieval
 NUM_RETRIEVED_CHUNKS = int(os.getenv("NUM_RETRIEVED_CHUNKS", "5"))

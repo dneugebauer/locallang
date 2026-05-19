@@ -24,7 +24,6 @@ Document text:
 {content}"""
 
 _SUPPORTED_EXTENSIONS = {".pdf", ".csv"}
-_EXTRACT_CHARS = 3000
 
 
 def enrich_documents(docs: list[Document]) -> list[Document]:
@@ -73,7 +72,7 @@ def enrich_documents(docs: list[Document]) -> list[Document]:
 
 
 def _extract(llm: ChatOllama, content: str) -> dict:
-    prompt = _EXTRACT_PROMPT.format(content=content[:_EXTRACT_CHARS])
+    prompt = _EXTRACT_PROMPT.format(content=content[:config.EXTRACT_METADATA_CHARS])
     try:
         response = llm.invoke(prompt)
         raw = response.content if hasattr(response, "content") else str(response)
