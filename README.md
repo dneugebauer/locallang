@@ -218,9 +218,10 @@ flowchart TD
     A2 --> I1 --> I2 --> I3 --> I4 --> DB[(Chroma\nvector store)]
     I2 -.->|writes| M
 
-    F{filter?} -->|optional| R1 & R2
+    Q([User question]) --> SCOPE[Scope gate\nclient · matter · doc_type]
+    SCOPE -->|Chroma where clause\nhard pre-filter| R1
+    SCOPE -->|pre-filtered docs| R2
     DB --> R1
-    Q([User question]) --> R1 & R2
     R1 & R2 --> R3
     R3 --> LLM[ChatOllama\nqwen2.5-coder:14b · llama3.2:3b]
     LLM --> ANS([Streamed answer + citations])

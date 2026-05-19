@@ -34,7 +34,11 @@ LocalLang is a fully private, locally-hosted RAG (Retrieval-Augmented Generation
 
 ### Retrieval
 
-Hybrid ensemble — 60% semantic (Chroma dense vector) + 40% keyword (BM25), fused and sliced to `NUM_RETRIEVED_CHUNKS`. Accepts an optional `filter` dict to scope retrieval to a metadata-matched document subset (e.g., `{"client": "Acme Corp"}`).
+Every query passes through a scope gate before reaching the retriever. The scope (client, matter, doc_type, date range) is resolved to a Chroma `where` clause, which is applied as a **hard pre-filter** — documents not matching the scope are excluded before any similarity scoring occurs. BM25 receives the same pre-filtered document set.
+
+After filtering, retrieval is a hybrid ensemble — 60% semantic (Chroma dense vector) + 40% keyword (BM25), fused and sliced to `NUM_RETRIEVED_CHUNKS`.
+
+The pre-filter model matters for professional contexts: a missed filter is not a relevance miss — it is a potential ethical wall violation. Chroma's `where` clause enforces the boundary at the query layer, not in post-processing.
 
 ### LLM
 
@@ -89,7 +93,8 @@ Metadata fields are indexed in Chroma and available for equality filtering at qu
 **Requirements:**
 - Browser-based chat UI (replaces `chat.py`)
 - Model selector dropdown
-- Document filter panel — client, matter, doc type, date range (consumes sidecar metadata)
+- **Matter selection is required before a query can be submitted.** The scope gate (client, matter, doc_type, date range) is the primary entry point — not an optional filter panel. Unscoped queries are only permitted via an explicit "Search across all matters" mode with a confirmation step.
+- Scope selection is enforced at the API layer (FastAPI), not just the UI — a request without a valid scope is rejected, not passed through unfiltered.
 - Source citation display with page reference
 - Session management (per-user conversation history)
 - FastAPI serves the retrieval chain and Ollama proxying
