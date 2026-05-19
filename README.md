@@ -4,7 +4,7 @@ A fully local, private RAG (Retrieval-Augmented Generation) system for querying 
 
 ## Overview
 
-Index a local repository or PDF/CSV directory, then ask questions about it from the terminal. Answers are grounded in your documents and include source citations.
+Index a local repository or PDF directory, then ask questions about it from the terminal. Answers are grounded in your documents and include source citations.
 
 Documents are automatically tagged with structured metadata (client, matter, doc type, date) at ingest time using a local LLM. Metadata is stored in `.meta.yaml` sidecar files alongside your sources — editable by hand, never overwritten once created. The retriever can scope any query to a subset of documents using these fields.
 
@@ -53,7 +53,7 @@ All settings live in `.env` (copy from `.env.example`):
 | Variable | Default | Description |
 |---|---|---|
 | `TARGET_REPO_PATH` | _(empty)_ | Path to a local code repository |
-| `PDF_SOURCE_DIR` | _(empty)_ | Path to a directory of PDFs and/or CSVs |
+| `PDF_SOURCE_DIR` | _(empty)_ | Path to a directory of PDF documents |
 | `CHROMA_PERSIST_DIR` | `./chroma_store` | Where the vector store is saved |
 | `LLM_MODEL` | `qwen2.5-coder:14b` | Ollama model for answering queries |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Ollama model for embeddings |
@@ -63,7 +63,7 @@ All settings live in `.env` (copy from `.env.example`):
 | `NUM_RETRIEVED_CHUNKS` | `3` | Chunks retrieved per query |
 | `SEMANTIC_WEIGHT` | `0.6` | Weight for semantic (vector) search |
 | `KEYWORD_WEIGHT` | `0.4` | Weight for BM25 keyword search |
-| `EXTRACT_METADATA` | `true` | Auto-extract metadata for new PDFs/CSVs at ingest |
+| `EXTRACT_METADATA` | `true` | Auto-extract metadata for new PDFs at ingest |
 | `EXTRACT_METADATA_MODEL` | _(LLM_MODEL)_ | Model used for extraction — can be lighter than your chat model |
 | `EXTRACT_METADATA_CHARS` | `3000` | Characters of document text fed to the extractor |
 
@@ -87,7 +87,7 @@ Use `reindex.py` when switching projects or sources. Use `core.ingest` to augmen
 
 ## Metadata & Filtering
 
-Every PDF and CSV is automatically tagged at ingest time. The extractor reads the first `EXTRACT_METADATA_CHARS` characters, calls the configured Ollama model, and writes a `.meta.yaml` sidecar beside the source file:
+Every PDF is automatically tagged at ingest time. The extractor reads the first `EXTRACT_METADATA_CHARS` characters, calls the configured Ollama model, and writes a `.meta.yaml` sidecar beside the source file:
 
 ```yaml
 # sample_docs/contract_acme.meta.yaml
@@ -157,8 +157,8 @@ locallang/
 │   ├── meta.py                # Sidecar loader (load_sidecar, load_dir_sidecar)
 │   ├── github_adapter.py      # Local repo / code file loader
 │   ├── pdf_adapter.py         # PyMuPDF PDF loader
-│   └── csv_adapter.py         # CSV loader — one document per row
-└── sample_docs/               # Gitignored — drop test PDFs and CSVs here
+│   └── csv_adapter.py         # Supplementary CSV loader (one document per row)
+└── sample_docs/               # Gitignored — drop test PDFs here
 ```
 
 ## Performance Tips
@@ -193,14 +193,12 @@ flowchart TD
     subgraph src ["Local files"]
         S1[Code repos]
         S2[PDFs]
-        S3[CSVs]
         M[(".meta.yaml\nsidecars")]
     end
 
     subgraph adapters ["Adapter layer"]
         A1[github_adapter\n+ dir sidecar]
         A2[pdf_adapter\n+ file sidecar]
-        A3[csv_adapter\n+ file sidecar]
     end
 
     subgraph ingest ["Ingestion pipeline · core/ingest.py"]
@@ -218,10 +216,9 @@ flowchart TD
 
     S1 --> A1
     S2 --> A2
-    S3 --> A3
-    M -.->|merged into metadata| A1 & A2 & A3
+    M -.->|merged into metadata| A1 & A2
 
-    A1 & A2 & A3 --> I1 --> I2 --> I3 --> I4 --> DB[(Chroma\nvector store)]
+    A1 & A2 --> I1 --> I2 --> I3 --> I4 --> DB[(Chroma\nvector store)]
     I2 -.->|writes| M
 
     F{filter?} -->|optional| R1 & R2
