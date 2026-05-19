@@ -1,10 +1,10 @@
 # LocalLang
 
-A fully local, private RAG (Retrieval-Augmented Generation) system for querying codebases and documents in plain English. No data leaves your machine — no cloud APIs, no rate limits, no cost per query.
+A fully local, private RAG (Retrieval-Augmented Generation) system for querying documents in plain English. No data leaves your machine — no cloud APIs, no rate limits, no cost per query.
 
 ## Overview
 
-Index a local repository or PDF directory, then ask questions about it from the terminal. Answers are grounded in your documents and include source citations.
+Index a directory of PDFs, then ask questions about them from the terminal. Answers are grounded in your documents and include source citations.
 
 Documents are automatically tagged with structured metadata (client, matter, doc type, date) at ingest time using a local LLM. Metadata is stored in `.meta.yaml` sidecar files alongside your sources — editable by hand, never overwritten once created. The retriever can scope any query to a subset of documents using these fields.
 
@@ -155,7 +155,7 @@ locallang/
 │   └── registry.py            # MD5-based file change tracking
 ├── adapters/
 │   ├── meta.py                # Sidecar loader (load_sidecar, load_dir_sidecar)
-│   ├── github_adapter.py      # Local repo / code file loader
+│   ├── github_adapter.py      # Supplementary code repo loader
 │   ├── pdf_adapter.py         # PyMuPDF PDF loader
 │   └── csv_adapter.py         # Supplementary CSV loader (one document per row)
 └── sample_docs/               # Gitignored — drop test PDFs here
@@ -191,13 +191,11 @@ flowchart LR
 ```mermaid
 flowchart TD
     subgraph src ["Local files"]
-        S1[Code repos]
         S2[PDFs]
         M[(".meta.yaml\nsidecars")]
     end
 
     subgraph adapters ["Adapter layer"]
-        A1[github_adapter\n+ dir sidecar]
         A2[pdf_adapter\n+ file sidecar]
     end
 
@@ -214,11 +212,10 @@ flowchart TD
         R3[EnsembleRetriever\nfusion + top-k slice]
     end
 
-    S1 --> A1
     S2 --> A2
-    M -.->|merged into metadata| A1 & A2
+    M -.->|merged into metadata| A2
 
-    A1 & A2 --> I1 --> I2 --> I3 --> I4 --> DB[(Chroma\nvector store)]
+    A2 --> I1 --> I2 --> I3 --> I4 --> DB[(Chroma\nvector store)]
     I2 -.->|writes| M
 
     F{filter?} -->|optional| R1 & R2
