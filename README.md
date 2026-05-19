@@ -4,7 +4,9 @@ A fully local, private RAG (Retrieval-Augmented Generation) system for querying 
 
 ## Overview
 
-Index a local repository or PDF directory, then ask questions about it from the terminal. Answers are grounded in your documents and include source citations.
+Index a local repository or PDF/CSV directory, then ask questions about it from the terminal. Answers are grounded in your documents and include source citations.
+
+Documents are automatically tagged with structured metadata (client, matter, doc type, date) at ingest time using a local LLM. Metadata is stored in `.meta.yaml` sidecar files alongside your sources — editable by hand, never overwritten once created. The retriever can scope any query to a subset of documents using these fields.
 
 Built on [LangChain](https://python.langchain.com/), [Ollama](https://ollama.com/), and [Chroma](https://www.tropic.io/chroma).
 
@@ -61,6 +63,9 @@ All settings live in `.env` (copy from `.env.example`):
 | `NUM_RETRIEVED_CHUNKS` | `3` | Chunks retrieved per query |
 | `SEMANTIC_WEIGHT` | `0.6` | Weight for semantic (vector) search |
 | `KEYWORD_WEIGHT` | `0.4` | Weight for BM25 keyword search |
+| `EXTRACT_METADATA` | `true` | Auto-extract metadata for new PDFs/CSVs at ingest |
+| `EXTRACT_METADATA_MODEL` | _(LLM_MODEL)_ | Model used for extraction — can be lighter than your chat model |
+| `EXTRACT_METADATA_CHARS` | `3000` | Characters of document text fed to the extractor |
 
 ## Ingestion
 
@@ -68,7 +73,7 @@ All settings live in `.env` (copy from `.env.example`):
 # Start a new RAG context (wipes existing index, then ingests from scratch)
 python reindex.py
 
-# Cap the number of documents ingested — useful for fast test runs (~5 min with 10k rows)
+# Cap the number of documents ingested — useful for fast test runs
 python reindex.py --limit 10000
 
 # Add to or update the current context (only processes new/changed files)
@@ -79,6 +84,40 @@ python -m core.ingest --force
 ```
 
 Use `reindex.py` when switching projects or sources. Use `core.ingest` to augment an existing index with new documents. The pipeline tracks processed files in `registry.json` using MD5 hashes — incremental runs skip unchanged files.
+
+## Metadata & Filtering
+
+Every PDF and CSV is automatically tagged at ingest time. The extractor reads the first `EXTRACT_METADATA_CHARS` characters, calls the configured Ollama model, and writes a `.meta.yaml` sidecar beside the source file:
+
+```yaml
+# sample_docs/contract_acme.meta.yaml
+client: Acme Corp
+date: '2024-03-15'
+doc_type: contract
+matter: M-2024-01
+summary: Service agreement between Acme Corp and Smith & Associates covering Q1 2024.
+```
+
+**Sidecar files are written once and never overwritten.** Edit them by hand at any time — the next ingest will pick up your changes. Set `EXTRACT_METADATA=false` to skip auto-extraction entirely.
+
+For a code repository, place a `.meta.yaml` at the repo root to tag all files from that source:
+
+```yaml
+# /path/to/your/repo/.meta.yaml
+client: Internal
+doc_type: codebase
+matter: backend-v2
+```
+
+### Using filters in retrieval
+
+Pass a `filter` dict to `build_retriever()` to scope both Chroma and BM25 to matching documents:
+
+```python
+retriever = build_retriever(vectorstore, all_docs, filter={"client": "Acme Corp"})
+```
+
+Simple equality matching on any metadata field is supported. Multiple keys are ANDed together.
 
 ## Terminal Chat
 
@@ -104,16 +143,18 @@ Sources are displayed after each answer. LaTeX math formatting is automatically 
 locallang/
 ├── chat.py                    # Terminal chat entry point (model picker, history, sanitizer)
 ├── reindex.py                 # Wipe and rebuild index from scratch
-├── config.py                  # Configuration (reads from .env)
+├── config.py                  # All configuration (reads from .env)
 ├── generate_sample_data.py    # Generates mock sales CSV for testing
 ├── requirements.txt
 ├── .env.example
 ├── core/
 │   ├── ingest.py              # Ingestion pipeline orchestrator
-│   ├── retriever.py           # Hybrid semantic + BM25 retriever
+│   ├── extractor.py           # LLM-based metadata extraction → writes .meta.yaml sidecars
+│   ├── retriever.py           # Hybrid semantic + BM25 retriever with optional metadata filter
 │   ├── chain.py               # LLM prompt, conversation history, streaming
 │   └── registry.py            # MD5-based file change tracking
 ├── adapters/
+│   ├── meta.py                # Sidecar loader (load_sidecar, load_dir_sidecar)
 │   ├── github_adapter.py      # Local repo / code file loader
 │   ├── pdf_adapter.py         # PyMuPDF PDF loader
 │   └── csv_adapter.py         # CSV loader — one document per row
@@ -123,6 +164,7 @@ locallang/
 ## Performance Tips
 
 - Use `llama3.2:3b` during development for fast responses; switch to `qwen2.5-coder:14b` for production quality
+- Set `EXTRACT_METADATA_MODEL` to a smaller model (e.g. `llama3.2:3b`) to speed up ingestion without affecting chat quality
 - Lower `NUM_RETRIEVED_CHUNKS` to reduce time-to-first-token
 - Set `OLLAMA_MAX_LOADED_MODELS=2` in your environment before starting Ollama to keep both the embedding model and LLM loaded simultaneously
 - Install Ollama via the official script (not snap) for GPU support on WSL2 — snap runs sandboxed and cannot access CUDA libraries
@@ -152,18 +194,20 @@ flowchart TD
         S1[Code repos]
         S2[PDFs]
         S3[CSVs]
+        M[(".meta.yaml\nsidecars")]
     end
 
     subgraph adapters ["Adapter layer"]
-        A1[github_adapter]
-        A2[pdf_adapter]
-        A3[csv_adapter]
+        A1[github_adapter\n+ dir sidecar]
+        A2[pdf_adapter\n+ file sidecar]
+        A3[csv_adapter\n+ file sidecar]
     end
 
     subgraph ingest ["Ingestion pipeline · core/ingest.py"]
         I1[MD5 registry diff\nskip unchanged files]
-        I2[RecursiveCharacter\nTextSplitter]
-        I3[OllamaEmbeddings\nnomic-embed-text]
+        I2[extractor.py\nLLM metadata extraction\nwrites .meta.yaml]
+        I3[RecursiveCharacter\nTextSplitter]
+        I4[OllamaEmbeddings\nnomic-embed-text]
     end
 
     subgraph retrieval ["Retrieval · core/retriever.py"]
@@ -172,8 +216,15 @@ flowchart TD
         R3[EnsembleRetriever\nfusion + top-k slice]
     end
 
-    S1 & S2 & S3 --> A1 & A2 & A3
-    A1 & A2 & A3 --> I1 --> I2 --> I3 --> DB[(Chroma\nvector store)]
+    S1 --> A1
+    S2 --> A2
+    S3 --> A3
+    M -.->|merged into metadata| A1 & A2 & A3
+
+    A1 & A2 & A3 --> I1 --> I2 --> I3 --> I4 --> DB[(Chroma\nvector store)]
+    I2 -.->|writes| M
+
+    F{filter?} -->|optional| R1 & R2
     DB --> R1
     Q([User question]) --> R1 & R2
     R1 & R2 --> R3
