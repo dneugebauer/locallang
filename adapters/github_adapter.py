@@ -3,6 +3,8 @@ from pathlib import Path
 from langchain_core.documents import Document
 import config
 
+from adapters.meta import load_dir_sidecar
+
 
 def load_repo_documents(repo_path: str, glob_patterns: list[str] | None = None) -> list[Document]:
     if not repo_path:
@@ -13,6 +15,7 @@ def load_repo_documents(repo_path: str, glob_patterns: list[str] | None = None) 
     if not root.exists():
         raise FileNotFoundError(f"Repo path does not exist: {repo_path}")
 
+    repo_sidecar = load_dir_sidecar(root)
     docs = []
     seen = set()
 
@@ -42,6 +45,7 @@ def load_repo_documents(repo_path: str, glob_patterns: list[str] | None = None) 
                     "file_type": file_path.suffix.lstrip("."),
                     "modified": os.path.getmtime(abs_path),
                     "filename": file_path.name,
+                    **repo_sidecar,
                 },
             ))
 

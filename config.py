@@ -24,6 +24,10 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5-coder:14b")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
+# Metadata extraction (runs once per new PDF/CSV at ingest time)
+EXTRACT_METADATA = os.getenv("EXTRACT_METADATA", "true").lower() == "true"
+EXTRACT_METADATA_MODEL = os.getenv("EXTRACT_METADATA_MODEL", LLM_MODEL)
+
 # Retrieval
 NUM_RETRIEVED_CHUNKS = int(os.getenv("NUM_RETRIEVED_CHUNKS", "5"))
 SEMANTIC_WEIGHT = float(os.getenv("SEMANTIC_WEIGHT", "0.6"))

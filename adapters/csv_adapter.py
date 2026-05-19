@@ -2,6 +2,8 @@ import csv
 from pathlib import Path
 from langchain_core.documents import Document
 
+from adapters.meta import load_sidecar
+
 
 def load_csv_documents(csv_dir: str) -> list[Document]:
     if not csv_dir:
@@ -25,6 +27,7 @@ def load_csv_documents(csv_dir: str) -> list[Document]:
 
 def _load_csv(csv_path: Path) -> list[Document]:
     docs = []
+    sidecar = load_sidecar(csv_path)
     with csv_path.open(encoding="utf-8", errors="ignore", newline="") as f:
         reader = csv.DictReader(f)
         rows = list(reader)
@@ -47,6 +50,7 @@ def _load_csv(csv_path: Path) -> list[Document]:
                 "row": row_num,
                 "total_rows": len(rows),
                 "columns": ", ".join(columns),
+                **sidecar,
             },
         ))
 

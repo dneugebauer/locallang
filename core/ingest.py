@@ -14,6 +14,7 @@ from langchain_chroma import Chroma
 
 import config
 from core.registry import load_registry, save_registry, get_changed_files, update_registry
+from core.extractor import enrich_documents
 from adapters.github_adapter import load_repo_documents, collect_repo_file_paths
 from adapters.pdf_adapter import load_pdf_documents, collect_pdf_file_paths
 from adapters.csv_adapter import load_csv_documents, collect_csv_file_paths
@@ -64,6 +65,11 @@ def run_ingest(force: bool = False, limit: int | None = None) -> None:
     if limit is not None:
         docs_to_index = docs_to_index[:limit]
         print(f"Limiting to {len(docs_to_index)} document(s).")
+
+    # Auto-extract metadata for new PDFs/CSVs that lack a sidecar
+    if config.EXTRACT_METADATA:
+        print(f"Extracting metadata with {config.EXTRACT_METADATA_MODEL}...")
+        docs_to_index = enrich_documents(docs_to_index)
 
     # Split
     splitter = RecursiveCharacterTextSplitter(
